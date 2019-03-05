@@ -50,7 +50,7 @@ jobs:
     working_directory: ~/plotly.js
     steps:
       - attach_workspace:
-          at: ~/plotly.js
+          at: ~
       - run:
           name: Run jasmine tests (batch 1)
           command: |
@@ -62,7 +62,7 @@ jobs:
     working_directory: /var/www/streambed/image_server/plotly.js/
     steps:
       - attach_workspace:
-          at: /var/www/streambed/image_server/plotly.js/
+          at: /var/www/streambed/image_server/
       - run:
           name: Run and setup container
           command: |
@@ -81,7 +81,7 @@ jobs:
     working_directory: /var/www/streambed/image_server/plotly.js/
     steps:
       - attach_workspace:
-          at: /var/www/streambed/image_server/plotly.js/
+          at: /var/www/streambed/image_server/
       - run:
           name: Run and setup container
           command: |
@@ -100,7 +100,7 @@ jobs:
     working_directory: ~/plotly.js
     steps:
       - attach_workspace:
-          at: ~/plotly.js
+          at: ~
       - run:
           name: Run syntax tests
           command: ./.circleci/test.sh syntax
@@ -111,7 +111,7 @@ jobs:
     working_directory: ~/plotly.js
     steps:
       - attach_workspace:
-          at: ~/plotly.js
+          at: ~
       - run:
           name: Build dist/
           command: npm run build
