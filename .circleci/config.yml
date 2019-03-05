@@ -56,7 +56,9 @@ jobs:
           at: ~/plotly.js
       - run:
           name: Run jasmine tests (batch 1)
-          command: npm run test-jasmine -- --skip-tags=gl,noCI,flaky $(circleci tests glob "test/jasmine/tests/*.js")
+          command: |
+            TESFILES=$(circleci tests glob "test/jasmine/tests/*.js")
+            npm run test-jasmine -- ${TESTFILES} --skip-tags=gl,noCI,flaky
 
   test-image:
     docker:
@@ -148,9 +150,6 @@ workflows:
     jobs:
       - build
       - test-jasmine:
-          requires:
-            - build
-      - test-jasmine2:
           requires:
             - build
       - test-image:
