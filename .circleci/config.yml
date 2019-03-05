@@ -38,7 +38,7 @@ jobs:
             - node_modules
           key: v{{ .Environment.CIRCLE_CACHE_VERSION }}-deps-{{ .Branch }}-{{ checksum "package.json" }}
       - persist_to_workspace:
-          root: ~
+          root: /home/circleci/
           paths:
             - plotly.js
 
