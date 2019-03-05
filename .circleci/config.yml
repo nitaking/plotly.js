@@ -21,8 +21,7 @@ jobs:
       - run:
           name: Run jasmine tests
           command: |
-            echo $(circleci tests glob "test/jasmine/tests/*")
-            circleci tests glob "test/jasmine/tests/*" | xargs -n 1 echo
+            circleci tests glob "test/jasmine/tests/*" | circleci tests split | xargs -n 1 echo
 
 
 workflows:
