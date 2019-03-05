@@ -38,11 +38,9 @@ jobs:
             - node_modules
           key: v{{ .Environment.CIRCLE_CACHE_VERSION }}-deps-{{ .Branch }}-{{ checksum "package.json" }}
       - persist_to_workspace:
-          root: .
+          root: ~
           paths:
-            - node_modules
-            - build
-            - dist
+            - plotly.js
 
   test-jasmine:
     docker:
@@ -51,7 +49,6 @@ jobs:
     parallelism: 8
     working_directory: ~/plotly.js
     steps:
-      - checkout
       - attach_workspace:
           at: ~/plotly.js
       - run:
@@ -64,7 +61,6 @@ jobs:
       - image: plotly/testbed:latest
     working_directory: /var/www/streambed/image_server/plotly.js/
     steps:
-      - checkout
       - attach_workspace:
           at: /var/www/streambed/image_server/plotly.js/
       - run:
@@ -84,7 +80,6 @@ jobs:
       - image: plotly/testbed:latest
     working_directory: /var/www/streambed/image_server/plotly.js/
     steps:
-      - checkout
       - attach_workspace:
           at: /var/www/streambed/image_server/plotly.js/
       - run:
@@ -104,7 +99,6 @@ jobs:
       - image: circleci/node:10.9.0
     working_directory: ~/plotly.js
     steps:
-      - checkout
       - attach_workspace:
           at: ~/plotly.js
       - run:
@@ -116,7 +110,6 @@ jobs:
       - image: circleci/node:10.9.0
     working_directory: ~/plotly.js
     steps:
-      - checkout
       - attach_workspace:
           at: ~/plotly.js
       - run:
