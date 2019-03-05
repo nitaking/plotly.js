@@ -21,8 +21,9 @@ jobs:
       - run:
           name: Run jasmine tests
           command: |
-            TESFILES=$(circleci tests glob "test/jasmine/tests/*.js")
-            echo ${TESTFILES}
+            echo $(circleci tests glob "test/jasmine/tests/*")
+            circleci tests glob "test/jasmine/tests/*" | xargs -n 1 echo
+
 
 workflows:
   version: 2
