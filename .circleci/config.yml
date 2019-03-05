@@ -50,7 +50,7 @@ jobs:
     working_directory: ~/plotly.js
     steps:
       - attach_workspace:
-          at: ~
+          at: ~/
       - run:
           name: Run jasmine tests (batch 1)
           command: |
@@ -100,7 +100,7 @@ jobs:
     working_directory: ~/plotly.js
     steps:
       - attach_workspace:
-          at: ~
+          at: ~/
       - run:
           name: Run syntax tests
           command: ./.circleci/test.sh syntax
@@ -111,7 +111,7 @@ jobs:
     working_directory: ~/plotly.js
     steps:
       - attach_workspace:
-          at: ~
+          at: ~/
       - run:
           name: Build dist/
           command: npm run build
