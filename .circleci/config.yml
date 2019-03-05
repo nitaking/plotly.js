@@ -48,6 +48,7 @@ jobs:
     docker:
       # need '-browsers' version to test in real (xvfb-wrapped) browsers
       - image: circleci/node:10.9.0-browsers
+    parallelism: 8
     working_directory: ~/plotly.js
     steps:
       - checkout
