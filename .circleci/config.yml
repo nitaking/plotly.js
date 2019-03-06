@@ -45,7 +45,7 @@ jobs:
           at: ~/
       - run:
           name: Run jasmine tests
-          command: ./.circleci/retry.sh npm run test-jasmine -- $(circleci tests glob "test/jasmine/tests/*" | circleci tests split) --skip-tags=noCI,flaky,gl
+          command: npm run test-jasmine -- $(circleci tests glob "test/jasmine/tests/*" | circleci tests split) --skip-tags=noCI,flaky,gl
 
   test-jasmine-flaky:
     docker:
@@ -64,7 +64,7 @@ jobs:
     docker:
       # need '-browsers' version to test in real (xvfb-wrapped) browsers
       - image: circleci/node:10.9.0-browsers
-    parallelism: 2
+    parallelism: 4
     working_directory: ~/plotly.js
     steps:
       - attach_workspace:
