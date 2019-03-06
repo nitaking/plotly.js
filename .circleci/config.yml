@@ -56,6 +56,19 @@ jobs:
           command: |
             npm run test-jasmine -- $(circleci tests glob "test/jasmine/tests/*" | circleci tests split) --skip-tags=noCI,flaky
 
+  test-bundle:
+    docker:
+      # need '-browsers' version to test in real (xvfb-wrapped) browsers
+      - image: circleci/node:10.9.0-browsers
+    working_directory: ~/plotly.js
+    steps:
+      - attach_workspace:
+          at: ~/
+      - run:
+          name: Run bundle-test
+          command: |
+            npm run test-bundle
+
   test-jasmine-flaky:
     docker:
       # need '-browsers' version to test in real (xvfb-wrapped) browsers
@@ -66,7 +79,7 @@ jobs:
       - attach_workspace:
           at: ~/
       - run:
-          name: Run jasmine tests (batch 1)
+          name: Run @flaky jasmine tests
           command: |
             npm run test-jasmine -- --tags=flaky --skip-tags=noCI
 
@@ -159,6 +172,9 @@ workflows:
           requires:
             - build
       - test-jasmine-flaky:
+          requires:
+            - build
+      - test-bundle:
           requires:
             - build
       - test-image:
