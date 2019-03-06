@@ -14,10 +14,6 @@ jobs:
     working_directory: ~/plotly.js
     steps:
       - checkout
-      - restore_cache:
-          keys:
-            - v{{ .Environment.CIRCLE_CACHE_VERSION }}-deps-{{ .Branch }}-{{ checksum "package-lock.json" }}
-            - v{{ .Environment.CIRCLE_CACHE_VERSION }}-deps-master-{{ checksum "package-lock.json" }}
       - run:
           name: Install dependencies
           command: |
@@ -33,10 +29,6 @@ jobs:
           command: |
             npm run pretest
             npm run cibuild
-      - save_cache:
-          paths:
-            - node_modules
-          key: v{{ .Environment.CIRCLE_CACHE_VERSION }}-deps-{{ .Branch }}-{{ checksum "package.json" }}
       - persist_to_workspace:
           root: /home/circleci/
           paths:
@@ -59,7 +51,7 @@ jobs:
     docker:
       # need '-browsers' version to test in real (xvfb-wrapped) browsers
       - image: circleci/node:10.9.0-browsers
-    parallelism: 4
+    parallelism: 2
     working_directory: ~/plotly.js
     steps:
       - attach_workspace:
@@ -72,7 +64,7 @@ jobs:
     docker:
       # need '-browsers' version to test in real (xvfb-wrapped) browsers
       - image: circleci/node:10.9.0-browsers
-    parallelism: 4
+    parallelism: 2
     working_directory: ~/plotly.js
     steps:
       - attach_workspace:
@@ -184,6 +176,9 @@ workflows:
           requires:
             - build
       - test-jasmine-flaky:
+          requires:
+            - build
+      - test-jasmine-gl:
           requires:
             - build
       - test-bundle:
