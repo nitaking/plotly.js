@@ -52,11 +52,35 @@ jobs:
       - attach_workspace:
           at: ~/
       - run:
-          name: Run jasmine tests (batch 1)
-          command: |
-            sudo cp /usr/share/zoneinfo/America/Anchorage /etc/localtime
-            export TZ='America/Anchorage'
-            npm run test-jasmine -- $(circleci tests glob "test/jasmine/tests/*" | circleci tests split) --skip-tags=noCI,flaky,gl
+          name: Run jasmine tests
+          command: ./.circleci/retry.sh npm run test-jasmine -- $(circleci tests glob "test/jasmine/tests/*" | circleci tests split) --skip-tags=noCI,flaky,gl
+
+  test-jasmine-flaky:
+    docker:
+      # need '-browsers' version to test in real (xvfb-wrapped) browsers
+      - image: circleci/node:10.9.0-browsers
+    parallelism: 4
+    working_directory: ~/plotly.js
+    steps:
+      - attach_workspace:
+          at: ~/
+      - run:
+          name: Run @flaky jasmine tests
+          command: ./.circleci/retry.sh npm run test-jasmine -- $(circleci tests glob "test/jasmine/tests/*" | circleci tests split) --tags=flaky --skip-tags=noCI
+
+  test-jasmine-gl:
+    docker:
+      # need '-browsers' version to test in real (xvfb-wrapped) browsers
+      - image: circleci/node:10.9.0-browsers
+    parallelism: 4
+    working_directory: ~/plotly.js
+    steps:
+      - attach_workspace:
+          at: ~/
+      - run:
+          name: Run @gl jasmine tests
+          command: ./.circleci/retry.sh npm run test-jasmine -- $(circleci tests glob "test/jasmine/tests/*" | circleci tests split) --tags=gl --skip-tags=noCI
+
 
   test-bundle:
     docker:
@@ -70,20 +94,6 @@ jobs:
           name: Run bundle-test
           command: |
             npm run test-bundle
-
-  test-jasmine-flaky:
-    docker:
-      # need '-browsers' version to test in real (xvfb-wrapped) browsers
-      - image: circleci/node:10.9.0-browsers
-    parallelism: 4
-    working_directory: ~/plotly.js
-    steps:
-      - attach_workspace:
-          at: ~/
-      - run:
-          name: Run @flaky jasmine tests
-          command: |
-            npm run test-jasmine -- $(circleci tests glob "test/jasmine/tests/*" | circleci tests split) --tags=flaky --skip-tags=noCI
 
   test-image:
     docker:
