@@ -81,7 +81,7 @@ jobs:
       - run:
           name: Run @flaky jasmine tests
           command: |
-            npm run test-jasmine -- --tags=flaky --skip-tags=noCI
+            npm run test-jasmine -- $(circleci tests glob "test/jasmine/tests/*" | circleci tests split) --tags=flaky --skip-tags=noCI
 
   test-image:
     docker:
