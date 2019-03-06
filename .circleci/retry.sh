@@ -41,3 +41,4 @@ set_tz () {
 
 set_tz
 retry "$@"
+exit $EXIT_STATE
