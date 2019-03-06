@@ -27,6 +27,8 @@ var plotTextLines = require('../pie/plot').plotTextLines;
 var formatPieValue = require('../pie/helpers').formatPieValue;
 var styleOne = require('./style').styleOne;
 
+var TRANSITION_TIME = 1500;
+
 module.exports = function plot(gd, cdmodule) {
     var fullLayout = gd._fullLayout;
     var layer = fullLayout._sunburstlayer;
@@ -56,9 +58,23 @@ module.exports = function plot(gd, cdmodule) {
                 return;
             }
 
+            var prevRootPt;
+
+            slices.each(function(pt) {
+                pt.data.data.prev = {
+                    rpx0: pt.rpx0,
+                    rpx1: pt.rpx1,
+                    x0: pt.x0,
+                    x1: pt.x1
+                };
+                if(!pt.parent) {
+                    prevRootPt = pt;
+                }
+            });
+
             var sliceData = partition(entry)
                 .descendants()
-                .filter(function(d) { return d.y1 <= maxDepth; });
+                .filter(function(pt) { return pt.y1 <= maxDepth; });
 
             var maxHeight = entry.height + 1;
             var yOffset = 0;
@@ -69,21 +85,63 @@ module.exports = function plot(gd, cdmodule) {
                 yOffset = 1;
             }
 
-            slices = slices.data(sliceData, function(d) { return d.data.data.id; });
+            // TODO clean up variable names
+            // -> differentiate between 'entry root' and 'hierarchy root'
 
-            slices.enter().append('g')
-                .classed('slice', true);
-            slices.exit().remove();
-
+            var rootPt = sliceData[0];
             var maxY = Math.min(maxHeight, maxDepth);
             var y2rpx = function(y) { return (y - yOffset) / maxY * rMax; };
             var rx2px = function(r, x) { return [r * Math.cos(x), -r * Math.sin(x)]; };
+            var pathSlice = function(d) { return Lib.pathAnnulus(d.rpx0, d.rpx1, d.x0, d.x1, cx, cy); };
+            var makeTweenFn = function(prev, next) {
+                var interp = d3.interpolate(prev, next);
+                return function(t) { return pathSlice(interp(t)); };
+            };
+
+            slices = slices.data(sliceData, function(pt) { return pt.data.data.id; });
+
+            slices.enter().append('g').classed('slice', true);
+
+            slices.exit().each(function(pt) {
+                var sliceTop = d3.select(this).transition()
+                    .duration(TRANSITION_TIME)
+                    .each('end', function(pt2) {
+                        pt2.data.data.prev = null;
+                        d3.select(this).remove();
+                    });
+
+                var slicePath = sliceTop.select('path.surface');
+
+                slicePath.attrTween('d', function(pt2) {
+                    var rootPtPrev = rootPt.data.data.prev;
+                    var a = pt2.x1 > rootPtPrev.x1 ? 2 * Math.PI : 0;
+                    // if pt to remove:
+                    // - is 'below' where the root-node used to be: shrink it radially
+                    // - otherwise, collapse it clockwise or counterclockwise which ever is shortest to theta=0
+                    var next = pt2.rpx1 < rootPtPrev.rpx1 ? {rpx0: 0, rpx1: 0} : {x0: a, x1: a};
+                    return makeTweenFn(pt.data.data.prev, next);
+                });
+
+                var sliceTextGroup = sliceTop.select('g.slicetext');
+                sliceTextGroup.attr('opacity', 0);
+
+                // TODO text lines
+            });
 
             var hasOutsideText = false;
             var quadrants = [
                 [[], []], // y<0: x<0, x>=0
                 [[], []]  // y>=0: x<0, x>=0
             ];
+
+            var nextX1ofPrevRootPt = null;
+            if(prevRootPt) {
+                slices.each(function(pt) {
+                    if(nextX1ofPrevRootPt === null && (pt.data.data.id === prevRootPt.data.data.id)) {
+                        nextX1ofPrevRootPt = pt.x1;
+                    }
+                });
+            }
 
             slices.each(function(pt) {
                 var sliceTop = d3.select(this);
@@ -95,8 +153,9 @@ module.exports = function plot(gd, cdmodule) {
                     s.style('pointer-events', 'all');
                 });
 
-                pt.rpx0 = y2rpx(pt.y0);
-                pt.rpx1 = y2rpx(pt.y1);
+                pt.next = {x0: pt.x0, x1: pt.x1};
+                pt.rpx0 = pt.next.rpx0 = y2rpx(pt.y0);
+                pt.rpx1 = pt.next.rpx1 = y2rpx(pt.y1);
                 pt.xmid = (pt.x0 + pt.x1) / 2;
                 pt.pxmid = rx2px(pt.rpx1, pt.xmid);
                 pt.midangle = -(pt.xmid - Math.PI / 2);
@@ -105,11 +164,37 @@ module.exports = function plot(gd, cdmodule) {
                 pt.rInscribed = getInscribedRadiusFraction(pt, trace);
                 quadrants[pt.pxmid[1] < 0 ? 0 : 1][pt.pxmid[0] < 0 ? 0 : 1].push(pt);
 
-                slicePath.attr('d', Lib.pathAnnulus(
-                    y2rpx(pt.y0), y2rpx(pt.y1),
-                    pt.x0, pt.x1,
-                    cx, cy
-                ));
+                slicePath.transition()
+                    .duration(TRANSITION_TIME)
+                    .attrTween('d', function(pt2) {
+                        var prev0 = pt2.data.data.prev;
+                        var prev;
+
+                        if(prev0) {
+                            // if pt already on graph, this is easy
+                            prev = prev0;
+                        } else {
+                            // for new pts:
+                            if(prevRootPt) {
+                                // if trace was visible before
+                                if(pt2.parent) {
+                                    // if new branch, twist it in clockwise or
+                                    // counterclockwise which ever is shorter to
+                                    // its final angle
+                                    var a = pt2.x1 > nextX1ofPrevRootPt ? 2 * Math.PI : 0;
+                                    prev = {x0: a, x1: a};
+                                } else {
+                                    // if new root-node, grow it radially
+                                    prev = {rpx0: 0, rpx1: 0};
+                                }
+                            } else {
+                                // start sector of new traces from theta=0
+                                prev = {x0: 0, x1: 0};
+                            }
+                        }
+
+                        return makeTweenFn(prev, pt2.next);
+                    });
 
                 slicePath.call(styleOne, pt, trace);
                 sliceTop.call(attachHoverHandlers, gd, cd);
@@ -128,9 +213,15 @@ module.exports = function plot(gd, cdmodule) {
                     s.attr('data-notex', 1);
                 });
 
+                sliceText
+                    .attr('opacity', 0)
+                    .transition().duration(TRANSITION_TIME)
+                    .attr('opacity', 1);
+
                 var textPosition = isLeaf ? trace.leaf.textposition : 'inside';
 
-                sliceText.text(formatSliceLabel(pt, trace, fullLayout))
+                sliceText
+                    .text(formatSliceLabel(pt, trace, fullLayout))
                     .attr({
                         'class': 'slicetext',
                         transform: '',
@@ -190,6 +281,7 @@ module.exports = function plot(gd, cdmodule) {
                 scootLabels(quadrants, trace);
             }
 
+            // TODO fade in/out
             plotTextLines(slices, trace);
         }
 
@@ -342,7 +434,7 @@ function attachHoverHandlers(sliceTop, gd, cd) {
     });
 }
 
-// TODO or call restyle, but would that smoothly transition?
+// TODO or call restyle (or animate), but would that smoothly transition?
 function attachClickHandlers(sliceTop, gd, cd, render) {
     var cd0 = cd[0];
     var trace = cd0.trace;
@@ -356,20 +448,27 @@ function attachClickHandlers(sliceTop, gd, cd, render) {
         if(clickVal === false) return;
 
         var fullLayoutNow = gd._fullLayout;
-        if(gd._dragging || fullLayoutNow.hovermode === false) return;
+        if(gd._dragging) return;
+
+        // TODO skip during animations!
+
+        Fx.loneUnhover(fullLayoutNow._hoverlayer.node());
+        // Lib.raiseToTop(this);
 
         var hierarchy = cd0.hierarchy;
         var cdi = pt.data.data;
         var id = cdi.id;
 
-        if(pt.parent) {
-            render(findEntryWithLevel(hierarchy, id));
-            // TODO event data
-        } else {
-            render(findEntryWithChild(hierarchy, id));
-            // TODO event data
-        }
+        var entry = pt.parent ?
+            findEntryWithLevel(hierarchy, id) :
+            findEntryWithChild(hierarchy, id);
 
+        var level = entry.descendants()[0].data.data.id;
+        trace.level = trace._input.level = level;
+
+        render(entry);
+
+        // TODO event data
         // TODO should we trigger 'plotly_click' also?
     });
 }
