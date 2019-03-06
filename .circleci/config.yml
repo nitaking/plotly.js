@@ -54,6 +54,8 @@ jobs:
       - run:
           name: Run jasmine tests (batch 1)
           command: |
+            sudo cp /usr/share/zoneinfo/America/Anchorage /etc/localtime
+            export TZ='America/Anchorage'
             npm run test-jasmine -- $(circleci tests glob "test/jasmine/tests/*" | circleci tests split) --skip-tags=noCI,flaky,gl
 
   test-bundle:
