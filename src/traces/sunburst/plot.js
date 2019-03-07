@@ -72,19 +72,19 @@ module.exports = function plot(gd, cdmodule) {
                 }
             });
 
-            var sliceData = partition(entry)
-                .descendants()
-                .filter(function(pt) { return pt.y1 <= maxDepth; });
-
+            var sliceData = partition(entry).descendants();
             var maxHeight = entry.height + 1;
             var yOffset = 0;
+            var cutoff = maxDepth;
 
             if(cd0.hasMultipleRoots && sliceData[0].data.data.pid === '') {
                 sliceData = sliceData.slice(1);
                 maxHeight -= 1;
                 yOffset = 1;
+                cutoff += 1;
             }
 
+            sliceData = sliceData.filter(function(pt) { return pt.y1 <= cutoff; });
             // TODO clean up variable names
             // -> differentiate between 'entry root' and 'hierarchy root'
 
