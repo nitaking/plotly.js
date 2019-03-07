@@ -65,7 +65,8 @@ module.exports = function plot(gd, cdmodule) {
                     rpx0: pt.rpx0,
                     rpx1: pt.rpx1,
                     x0: pt.x0,
-                    x1: pt.x1
+                    x1: pt.x1,
+                    transform: pt.transform
                 };
                 if(!pt.parent) {
                     prevRootPt = pt;
@@ -85,6 +86,7 @@ module.exports = function plot(gd, cdmodule) {
             }
 
             sliceData = sliceData.filter(function(pt) { return pt.y1 <= cutoff; });
+
             // TODO clean up variable names
             // -> differentiate between 'entry root' and 'hierarchy root'
 
@@ -265,20 +267,11 @@ module.exports = function plot(gd, cdmodule) {
                     s.attr('data-notex', 1);
                 });
 
-                sliceText
-                    .attr('opacity', 0)
-                    .transition().duration(TRANSITION_TIME)
-                    .attr('opacity', 1);
-
                 var textPosition = isLeaf ? trace.leaf.textposition : 'inside';
 
-                sliceText
-                    .text(formatSliceLabel(pt, trace, fullLayout))
-                    .attr({
-                        'class': 'slicetext',
-                        transform: '',
-                        'text-anchor': 'middle'
-                    })
+                sliceText.text(formatSliceLabel(pt, trace, fullLayout))
+                    .classed('slicetext', true)
+                    .attr('text-anchor', 'middle')
                     .call(Drawing.font, isRoot || textPosition === 'outside' ?
                       determineOutsideTextFont(trace, pt, fullLayout.font) :
                       determineInsideTextFont(trace, pt, fullLayout.font))
@@ -302,11 +295,11 @@ module.exports = function plot(gd, cdmodule) {
                     }
                 }
 
-                var translateX = cx + pt.pxmid[0] * transform.rCenter + (transform.x || 0);
-                var translateY = cy + pt.pxmid[1] * transform.rCenter + (transform.y || 0);
+                pt.transform = transform;
 
                 // save some stuff to use later ensure no labels overlap
                 if(transform.outside) {
+                    var translateY = cy + pt.pxmid[1] * transform.rCenter + (transform.y || 0);
                     pt.px0 = rx2px(pt.rpx0, pt.x0);
                     pt.px1 = rx2px(pt.rpx1, pt.x1);
                     pt.cxFinal = cx;
@@ -319,14 +312,94 @@ module.exports = function plot(gd, cdmodule) {
                     hasOutsideText = true;
                 }
 
-                sliceText.attr('transform',
-                    'translate(' + translateX + ',' + translateY + ')' +
-                    (transform.scale < 1 ? ('scale(' + transform.scale + ')') : '') +
-                    (transform.rotate ? ('rotate(' + transform.rotate + ')') : '') +
-                    'translate(' +
-                        (-(textBB.left + textBB.right) / 2) + ',' +
-                        (-(textBB.top + textBB.bottom) / 2) +
-                    ')');
+                sliceText.transition()
+                    .duration(TRANSITION_TIME)
+                    .attrTween('transform', function(pt2) {
+                        var prev0 = pt2.data.data.prev;
+                        var transform2 = pt2.transform;
+                        var prev;
+
+                        if(prev0) {
+                            prev = prev0;
+                        } else {
+                            prev = {
+                                rpx1: pt2.rpx1,
+                                transform: {
+                                    scale: 0,
+                                    rotate: transform2.rotate,
+                                    rCenter: transform2.rCenter,
+                                    x: transform2.x,
+                                    y: transform2.y
+                                }
+                            };
+
+                            // for new pts:
+                            if(prevRootPt) {
+                                // if trace was visible before
+                                if(pt2.parent) {
+                                    if(nextX1ofPrevRootPt) {
+                                        // if new branch, twist it in clockwise or
+                                        // counterclockwise which ever is shorter to
+                                        // its final angle
+                                        var a = pt2.x1 > nextX1ofPrevRootPt ? 2 * Math.PI : 0;
+                                        prev.x0 = prev.x1 = a;
+                                    } else {
+                                        var parent = pt2.parent;
+                                        var parentPrev = parent.data.data.prev;
+
+                                        if(parentPrev) {
+                                            // if new leaf with visible parent
+                                            var parentChildren = parent.children;
+                                            var ci = parentChildren.indexOf(pt2);
+                                            var n = parentChildren.length;
+                                            var interp = d3.interpolate(parentPrev.x0, parentPrev.x1);
+                                            prev.x0 = interp(ci / n);
+                                            prev.x1 = interp(ci / n);
+                                        } else {
+                                            // if new leaf w/o visible parent
+                                            // TODO !!!
+                                            // HOW ???
+                                            prev.x0 = prev.x1 = 0;
+                                        }
+                                    }
+                                } else {
+                                    // if new root-node
+                                    prev.x0 = prev.x1 = 0;
+                                }
+                            } else {
+                                // on new traces
+                                prev.x0 = prev.x1 = 0;
+                            }
+                        }
+
+                        var rpx1Fn = d3.interpolate(prev.rpx1, pt2.rpx1);
+                        var x0Fn = d3.interpolate(prev.x0, pt2.x0);
+                        var x1Fn = d3.interpolate(prev.x1, pt2.x1);
+                        var scaleFn = d3.interpolate(prev.transform.scale, transform2.scale);
+                        var rotateFn = d3.interpolate(prev.transform.rotate, transform2.rotate);
+                        var rCenterFn = d3.interpolate(prev.transform.rCenter, transform2.rCenter);
+
+                        return function(t) {
+                            var rpx1Now = rpx1Fn(t);
+                            var x0Now = x0Fn(t);
+                            var x1Now = x1Fn(t);
+                            var scaleNow = scaleFn(t);
+                            var rotateNow = rotateFn(t);
+                            var rCenterNow = rCenterFn(t);
+
+                            var pxmid = rx2px(rpx1Now, (x0Now + x1Now) / 2);
+                            var tx = cx + pxmid[0] * rCenterNow + (transform.x || 0);
+                            var ty = cy + pxmid[1] * rCenterNow + (transform.y || 0);
+
+                            return 'translate(' + tx + ',' + ty + ')' +
+                                (scaleNow < 1 ? ('scale(' + scaleNow + ')') : '') +
+                                (rotateNow ? ('rotate(' + rotateNow + ')') : '') +
+                                'translate(' +
+                                    (-(textBB.left + textBB.right) / 2) + ',' +
+                                    (-(textBB.top + textBB.bottom) / 2) +
+                                ')';
+                        };
+                    });
             });
 
             if(hasOutsideText) {
