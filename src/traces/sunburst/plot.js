@@ -113,12 +113,40 @@ module.exports = function plot(gd, cdmodule) {
                 var slicePath = sliceTop.select('path.surface');
 
                 slicePath.attrTween('d', function(pt2) {
+                    var next;
                     var rootPtPrev = rootPt.data.data.prev;
-                    var a = pt2.x1 > rootPtPrev.x1 ? 2 * Math.PI : 0;
-                    // if pt to remove:
-                    // - is 'below' where the root-node used to be: shrink it radially
-                    // - otherwise, collapse it clockwise or counterclockwise which ever is shortest to theta=0
-                    var next = pt2.rpx1 < rootPtPrev.rpx1 ? {rpx0: 0, rpx1: 0} : {x0: a, x1: a};
+
+                    if(rootPtPrev) {
+                        var a = pt2.x1 > rootPtPrev.x1 ? 2 * Math.PI : 0;
+                        // if pt to remove:
+                        // - if 'below' where the root-node used to be: shrink it radially inward
+                        // - otherwise, collapse it clockwise or counterclockwise which ever is shortest to theta=0
+                        next = pt2.rpx1 < rootPtPrev.rpx1 ? {rpx0: 0, rpx1: 0} : {x0: a, x1: a};
+                    } else {
+                        // this happens when maxdepth is set, when leaves must
+                        // be removed and the rootPt is new (i.e. does not have a 'prev' object)
+                        var parent;
+                        var parentId = pt2.parent.data.data.id;
+                        slices.each(function(pt3) {
+                            if(!parent && pt3.data.data.id === parentId) {
+                                parent = pt3;
+                            }
+                        });
+                        var parentChildren = parent.children;
+                        var ci;
+                        parentChildren.forEach(function(pt3, i) {
+                            if(pt3.data.data.id === pt2.data.data.id) {
+                                return ci = i;
+                            }
+                        });
+                        var n = parentChildren.length;
+                        var interp = d3.interpolate(parent.x0, parent.x1);
+                        next = {
+                            rpx0: rMax, rpx1: rMax,
+                            x0: interp(ci / n), x1: interp((ci + 1) / n)
+                        };
+                    }
+
                     return makeTweenFn(pt.data.data.prev, next);
                 });
 
@@ -136,8 +164,9 @@ module.exports = function plot(gd, cdmodule) {
 
             var nextX1ofPrevRootPt = null;
             if(prevRootPt) {
+                var prevRootPtId = prevRootPt.data.data.id;
                 slices.each(function(pt) {
-                    if(nextX1ofPrevRootPt === null && (pt.data.data.id === prevRootPt.data.data.id)) {
+                    if(nextX1ofPrevRootPt === null && (pt.data.data.id === prevRootPtId)) {
                         nextX1ofPrevRootPt = pt.x1;
                     }
                 });
@@ -178,11 +207,34 @@ module.exports = function plot(gd, cdmodule) {
                             if(prevRootPt) {
                                 // if trace was visible before
                                 if(pt2.parent) {
-                                    // if new branch, twist it in clockwise or
-                                    // counterclockwise which ever is shorter to
-                                    // its final angle
-                                    var a = pt2.x1 > nextX1ofPrevRootPt ? 2 * Math.PI : 0;
-                                    prev = {x0: a, x1: a};
+                                    if(nextX1ofPrevRootPt) {
+                                        // if new branch, twist it in clockwise or
+                                        // counterclockwise which ever is shorter to
+                                        // its final angle
+                                        var a = pt2.x1 > nextX1ofPrevRootPt ? 2 * Math.PI : 0;
+                                        prev = {x0: a, x1: a};
+                                    } else {
+                                        var parent = pt2.parent;
+                                        var parentPrev = parent.data.data.prev;
+
+                                        // if new leaf (when maxdepth is set),
+                                        // grow it radially and angularly from
+                                        // its parent node
+                                        prev = {rpx0: rMax, rpx1: rMax};
+
+                                        if(parentPrev) {
+                                            var parentChildren = parent.children;
+                                            var ci = parentChildren.indexOf(pt2);
+                                            var n = parentChildren.length;
+                                            var interp = d3.interpolate(parentPrev.x0, parentPrev.x1);
+                                            prev.x0 = interp(ci / n);
+                                            prev.x1 = interp(ci / n);
+                                        } else {
+                                            // TODO !!!
+                                            // HOW ???
+                                            prev.x0 = prev.x1 = 0;
+                                        }
+                                    }
                                 } else {
                                     // if new root-node, grow it radially
                                     prev = {rpx0: 0, rpx1: 0};
