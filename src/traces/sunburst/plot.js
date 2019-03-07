@@ -27,7 +27,7 @@ var plotTextLines = require('../pie/plot').plotTextLines;
 var formatPieValue = require('../pie/helpers').formatPieValue;
 var styleOne = require('./style').styleOne;
 
-var TRANSITION_TIME = 1500;
+var TRANSITION_TIME = 1000;
 
 module.exports = function plot(gd, cdmodule) {
     var fullLayout = gd._fullLayout;
